@@ -1,0 +1,8 @@
+# Ignorar el entorno virtual de Python
+Models/CNN1/py312/
+**/py312/
+__pycache__/
+*.pyc
+
+# Ignorar el dataset gigante
+Models/Datasets/RML2016.10a_dict.dat
