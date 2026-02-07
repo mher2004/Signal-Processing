@@ -1,0 +1,156 @@
+this is my model
+def MCLDNN(weights=None, input_shape1=[2,128], input_shape2=[128,1], classes=11, **kwargs):
+    dr = 0.5
+
+    input1 = Input(input_shape1+[1], name='input1')
+    input2 = Input(input_shape2, name='input2')
+    input3 = Input(input_shape2, name='input3')
+
+    x1 = Conv2D(64, (2,8), padding='same', activation="relu")(input1)
+    x1 = BatchNormalization()(x1)
+
+    x2 = Conv1D(64, 8, padding='causal', activation="relu")(input2)
+    x2 = BatchNormalization()(x2)
+    x2_reshape = Reshape([-1, 128, 64])(x2)
+
+    x3 = Conv1D(64, 8, padding='causal', activation="relu")(input3)
+    x3 = BatchNormalization()(x3)
+    x3_reshape = Reshape([-1, 128, 64])(x3)
+
+    x = concatenate([x2_reshape, x3_reshape], axis=1)
+    x = Conv2D(64, (1,8), padding='same', activation="relu")(x)
+    x = BatchNormalization()(x)
+
+    x = concatenate([x1, x])
+    x = Conv2D(128, (2,5), padding='valid', activation="relu")(x)
+    x = BatchNormalization()(x)
+
+    x = Reshape(target_shape=((124, 128)))(x)
+    x = Bidirectional(LSTM(units=128, return_sequences=True, dropout=0.2))(x)
+
+
+    attention_out = MultiHeadAttention(num_heads=4, key_dim=128)(x, x)
+    x = LayerNormalization()(attention_out + x) # Residual connection
+
+    x = GlobalAveragePooling1D()(x) # Better than a simple Flatten for signals
+
+    x = Dense(128, activation='selu', kernel_initializer='lecun_normal', name='fc1')(x)
+    x = AlphaDropout(dr)(x)
+
+    x = Dense(128, activation='selu', kernel_initializer='lecun_normal', name='fc2')(x)
+    x = AlphaDropout(dr)(x)
+
+    x = Dense(classes, activation='softmax', name='softmax')(x)
+
+    model = Model(inputs=[input1, input2, input3], outputs=x)
+
+    if weights is not None:
+        model.load_weights(weights)
+
+    return model
+this is how i compile it
+model.compile(
+    loss=keras.losses.CategoricalCrossentropy(label_smoothing=0.1),
+    metrics=['accuracy'],
+    optimizer=keras.optimizers.AdamW(learning_rate=0.0002, clipnorm=1.0)
+)
+and this is how i train it
+history = model.fit([X_train_aug,X1_train,X2_train],
+    Y_train_aug,
+    batch_size=batch_size,
+    epochs=nb_epoch,
+    verbose=2,
+    validation_data=([X_val,X1_val,X2_val],Y_val),
+    callbacks = [
+    keras.callbacks.ModelCheckpoint(
+        filepath,
+        monitor='val_loss',
+        verbose=1,
+        save_best_only=True,
+        mode='min'
+    ),
+
+    keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.5,
+        patience=5,
+        verbose=1,
+        min_lr=0.000001
+    ),
+
+    keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        patience=10,
+        verbose=1,
+        mode='min',
+        restore_best_weights=True
+    )
+])
+batch size is 1024 i have 11 classes to predict of signals
+i got this type of accuracy
+SNR -20dB | Accuracy: 0.1500
+SNR -18dB | Accuracy: 0.1905
+SNR -16dB | Accuracy: 0.2414
+SNR -14dB | Accuracy: 0.2677
+SNR -12dB | Accuracy: 0.3414
+SNR -10dB | Accuracy: 0.4009
+SNR  -8dB | Accuracy: 0.4800
+SNR  -6dB | Accuracy: 0.5495
+SNR  -4dB | Accuracy: 0.6500
+SNR  -2dB | Accuracy: 0.7664
+SNR   0dB | Accuracy: 0.8350
+SNR   2dB | Accuracy: 0.8500
+SNR   4dB | Accuracy: 0.8473
+SNR   6dB | Accuracy: 0.8495
+SNR   8dB | Accuracy: 0.8527
+SNR  10dB | Accuracy: 0.8550
+SNR  12dB | Accuracy: 0.8523
+SNR  14dB | Accuracy: 0.8591
+SNR  16dB | Accuracy: 0.8564
+SNR  18dB | Accuracy: 0.8505
+i want to get like 90%+ accuracy on 0> snr 
+i have done data augmentation and my data is the RML2016.10a_dict.dat dataset
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
